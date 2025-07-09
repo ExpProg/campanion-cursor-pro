@@ -1,0 +1,32 @@
+[debug] [2025-06-29T18:41:55.473Z] ----------------------------------------------------------------------
+[debug] [2025-06-29T18:41:55.478Z] Command:       /Users/artemmornev/.nvm/versions/node/v22.15.0/bin/node /usr/local/bin/firebase projects:list
+[debug] [2025-06-29T18:41:55.478Z] CLI Version:   9.11.0
+[debug] [2025-06-29T18:41:55.478Z] Platform:      darwin
+[debug] [2025-06-29T18:41:55.478Z] Node Version:  v22.15.0
+[debug] [2025-06-29T18:41:55.478Z] Time:          Sun Jun 29 2025 21:41:55 GMT+0300 (Москва, стандартное время)
+[debug] [2025-06-29T18:41:55.478Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-06-29T18:41:55.479Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-06-29T18:41:55.503Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-29T18:41:55.503Z] > authorizing via signed-in user (amorneff@gmail.com)
+[debug] [2025-06-29T18:41:55.505Z] > refreshing access token with scopes: []
+[debug] [2025-06-29T18:41:55.505Z] >>> HTTP REQUEST POST https://www.googleapis.com/oauth2/v3/token  
+ <request body omitted>
+[debug] [2025-06-29T18:41:55.634Z] <<< HTTP RESPONSE 400 {"cache-control":"no-cache, no-store, max-age=0, must-revalidate","expires":"Mon, 01 Jan 1990 00:00:00 GMT","date":"Sun, 29 Jun 2025 18:41:55 GMT","pragma":"no-cache","content-type":"application/json; charset=utf-8","vary":"X-Origin, Referer, Origin,Accept-Encoding","server":"scaffolding on HTTPServer2","x-xss-protection":"0","x-frame-options":"SAMEORIGIN","x-content-type-options":"nosniff","alt-svc":"h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000","accept-ranges":"none","transfer-encoding":"chunked"}
+[debug] [2025-06-29T18:41:55.634Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
+[debug] [2025-06-29T18:41:55.801Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 401
+[debug] [2025-06-29T18:41:55.801Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[debug] [2025-06-29T18:41:55.802Z] HTTP Error: 401, Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+[debug] [2025-06-29T18:41:55.935Z] FirebaseError: HTTP Error: 401, Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.
+    at module.exports (/usr/local/lib/node_modules/firebase-tools/lib/responseToError.js:38:12)
+    at Client.doRequest (/usr/local/lib/node_modules/firebase-tools/lib/apiv2.js:238:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Client.request (/usr/local/lib/node_modules/firebase-tools/lib/apiv2.js:96:20)
+    at async getProjectPage (/usr/local/lib/node_modules/firebase-tools/lib/management/projects.js:233:17)
+    at async getFirebaseProjectPage (/usr/local/lib/node_modules/firebase-tools/lib/management/projects.js:250:23)
+    at async Object.listFirebaseProjects (/usr/local/lib/node_modules/firebase-tools/lib/management/projects.js:281:29)
+    at async Command.actionFn (/usr/local/lib/node_modules/firebase-tools/lib/commands/projects-list.js:50:20)
+[error] 
+[error] Error: Failed to list Firebase projects. See firebase-debug.log for more info.
+[debug] [2025-06-29T18:41:55.959Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-06-29T18:41:55.959Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
