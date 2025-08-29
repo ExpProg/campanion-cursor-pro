@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { UserRole } from '@/types/user';
+import Image from 'next/image';
 
 // Функция для проверки публичных маршрутов
 const isPublicRoute = (pathname: string): boolean => {
@@ -108,8 +109,8 @@ export function Header() {
               href="/camps" 
               className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
             >
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">C</span>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-[40px]">
+                <span role="img" aria-label="Палатка">🏕️</span>
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-lg font-semibold text-foreground">Campanion Pro</h1>

@@ -187,8 +187,8 @@ export const Sidebar = memo(() => {
           {/* Header с кнопкой закрытия */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">C</span>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[30px]">
+                <span role="img" aria-label="Палатка">🏕️</span>
               </div>
               <h2 className="text-lg font-semibold text-foreground">Меню</h2>
             </div>

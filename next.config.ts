@@ -9,11 +9,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '**', // Разрешаем все HTTPS домены для демо
+        hostname: 'funcarve.ru',
       },
     ],
     dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 };
 

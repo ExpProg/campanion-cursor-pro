@@ -10,12 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, MapPin, Users, Plus, X, Upload, Link as LinkIcon } from 'lucide-react';
-import { CampType, CampDifficulty, CreateCampData, CampVariant, Camp } from '@/types/camp';
+import { CalendarIcon, MapPin, Plus, X, Upload } from 'lucide-react';
+import { CreateCampData, CampVariant, Camp, CampType } from '@/types/camp';
+import { CampType as CampTypeEntity } from '@/types/campType';
+import { getActiveCampTypes } from '@/lib/campTypeService';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useOrganizers } from '@/hooks/useOrganizers';
 
 interface CampFormProps {
   onSubmit: (campData: CreateCampData) => Promise<void>;
@@ -24,24 +27,6 @@ interface CampFormProps {
   initialData?: Camp | null;
   isEditing?: boolean;
 }
-
-const campTypes: CampType[] = [
-  'летний',
-  'зимний',
-  'языковой',
-  'спортивный',
-  'творческий',
-  'технический',
-  'приключенческий',
-  'образовательный',
-];
-
-const difficulties: CampDifficulty[] = [
-  'начинающий',
-  'средний',
-  'продвинутый',
-  'экспертный',
-];
 
 export const CampForm: React.FC<CampFormProps> = ({
   onSubmit,
@@ -56,14 +41,15 @@ export const CampForm: React.FC<CampFormProps> = ({
     startDate: new Date(),
     endDate: new Date(),
     location: '',
-    type: 'летний',
+    type: '',
+    status: 'draft',
     price: undefined,
     variants: [],
-    organizer: '',
+    organizerId: '',
     image: '',
+    campUrl: '',
+    directBooking: false,
     features: [],
-    difficulty: 'начинающий',
-    ageGroup: '',
     included: [],
   });
 
@@ -72,118 +58,174 @@ export const CampForm: React.FC<CampFormProps> = ({
   const [imageInputType, setImageInputType] = useState<'url' | 'file'>('url');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [useVariants, setUseVariants] = useState(false);
+  const [campTypes, setCampTypes] = useState<CampTypeEntity[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+  const { organizers, loading: loadingOrganizers, error: errorOrganizers } = useOrganizers();
 
-  // Инициализация формы с данными для редактирования
+  // Загружаем типы кэмпов из базы данных
   useEffect(() => {
-    if (initialData && isEditing) {
-      console.log('🔄 Инициализация формы с данными для редактирования:', initialData);
+    const loadCampTypes = async () => {
+      try {
+        setLoadingTypes(true);
+        console.log('🔍 Загружаем типы кэмпов из базы данных...');
+        const types = await getActiveCampTypes();
+        setCampTypes(types);
+        
+        // Если типов нет в базе, используем статические
+        if (types.length === 0) {
+          console.log('Типы кэмпов не найдены в базе, используем статические');
+        } else {
+          console.log('✅ Загружено типов кэмпов:', types.length, types.map(t => t.name));
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки типов кэмпов:', error);
+        toast.error('Не удалось загрузить типы кэмпов');
+      } finally {
+        setLoadingTypes(false);
+      }
+    };
+
+    loadCampTypes();
+  }, []);
+
+  // Статические типы для fallback
+  const staticCampTypes: CampType[] = [
+    'летний',
+    'зимний',
+    'языковой',
+    'спортивный',
+    'творческий',
+    'технический',
+    'приключенческий',
+    'образовательный',
+  ];
+
+  // Используем типы из базы данных или статические
+  const availableTypes = campTypes.length > 0 ? campTypes.map(t => t.name) : staticCampTypes;
+  
+  // Проверяем, есть ли текущий тип в доступных типах
+  const currentTypeExists = availableTypes.includes(formData.type);
+
+  useEffect(() => {
+    // Ждем, когда загрузятся организаторы и initialData
+    if (initialData && !loadingOrganizers && organizers.length > 0) {
+      // Сравниваем id через String.trim()
+      const orgId = String(initialData.organizerId || '').trim();
+      const orgExists = organizers.some(o => String(o.id).trim() === orgId);
+      console.log('[CampForm] useEffect: initialData.organizerId =', orgId);
+      console.log('[CampForm] useEffect: organizers =', organizers.map(o => o.id));
+      console.log('[CampForm] useEffect: orgExists =', orgExists);
       setFormData({
         title: initialData.title,
         description: initialData.description,
         startDate: initialData.startDate,
         endDate: initialData.endDate,
         location: initialData.location,
-        type: initialData.type,
+        type: initialData.type || (availableTypes.length > 0 ? availableTypes[0] : ''),
+        status: initialData.status,
         price: initialData.price,
         variants: initialData.variants || [],
-        organizer: initialData.organizer,
+        organizerId: orgExists ? orgId : '',
         image: initialData.image || '',
-        features: initialData.features || [],
-        difficulty: initialData.difficulty,
-        ageGroup: initialData.ageGroup,
-        included: initialData.included || [],
+        campUrl: initialData.campUrl || '',
+        directBooking: initialData.directBooking || false,
+        features: initialData.features,
+        included: initialData.included,
       });
-
-      // Устанавливаем режим вариантов если они есть
-      if (initialData.variants && initialData.variants.length > 0) {
-        setUseVariants(true);
-      }
+      setUseVariants(Boolean(initialData.variants && initialData.variants.length > 0));
     }
-  }, [initialData, isEditing]);
+  }, [initialData, loadingOrganizers, organizers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     // Валидация
     if (!formData.title.trim()) {
-      toast.error('Введите название кэмпа');
+      toast.error('Название кэмпа обязательно');
       return;
     }
-
+    
     if (!formData.description.trim()) {
-      toast.error('Введите описание кэмпа');
+      toast.error('Описание кэмпа обязательно');
       return;
     }
-
+    
+    if (!formData.organizerId) {
+      toast.error('Организатор обязателен');
+      return;
+    }
+    
     if (!formData.location.trim()) {
-      toast.error('Введите местоположение');
+      toast.error('Местоположение обязательно');
       return;
     }
-
-    if (!formData.organizer.trim()) {
-      toast.error('Введите организатора');
+    
+    if (!formData.campUrl.trim()) {
+      toast.error('Ссылка на кэмп обязательна');
       return;
     }
-
-    if (!formData.ageGroup.trim()) {
-      toast.error('Введите возрастную группу');
+    
+    // Проверяем, что ссылка имеет правильный формат
+    try {
+      new URL(formData.campUrl);
+    } catch {
+      toast.error('Ссылка на кэмп должна быть в правильном формате (например, https://example.com)');
       return;
     }
-
-    // Проверяем цену только если не используются варианты
-    if (!useVariants && (formData.price === undefined || formData.price <= 0)) {
-      toast.error('Введите корректную стоимость');
+    
+    if (!formData.type || formData.type.trim() === '') {
+      toast.error('Тип кэмпа обязателен');
       return;
     }
-
-    // Если используются варианты, проверяем их валидность
-    if (useVariants) {
-      if (!formData.variants || formData.variants.length === 0) {
-        toast.error('Добавьте хотя бы один вариант');
-        return;
-      }
-
-      for (const variant of formData.variants) {
-        if (!variant.name.trim()) {
-          toast.error('Введите название для всех вариантов');
-          return;
-        }
-        if (!variant.description.trim()) {
-          toast.error('Введите описание для всех вариантов');
-          return;
-        }
-        if (variant.price <= 0) {
-          toast.error('Введите корректную цену для всех вариантов');
-          return;
-        }
-      }
+    
+    // Проверяем, что выбранный тип существует в доступных типах
+    if (!availableTypes.includes(formData.type)) {
+      toast.error('Выбранный тип кэмпа не существует');
+      return;
     }
-
-    if (formData.startDate >= formData.endDate) {
+    
+    if (formData.endDate <= formData.startDate) {
       toast.error('Дата окончания должна быть позже даты начала');
       return;
     }
 
-    try {
-      // Если выбран файл, можно здесь добавить логику загрузки в cloud storage
-      let imageUrl = formData.image;
-      if (imageInputType === 'file' && selectedFile) {
-        // TODO: Здесь будет логика загрузки файла в Firebase Storage
-        toast.info('Загрузка файла будет реализована позже. Используйте URL изображения.');
+    // Проверяем варианты или базовую цену
+    if (useVariants) {
+      if (!formData.variants || formData.variants.length === 0) {
+        toast.error('Добавьте хотя бы один вариант участия');
         return;
       }
+      
+      // Проверяем каждый вариант
+      for (const variant of formData.variants) {
+        if (!variant.name.trim()) {
+          toast.error('Название варианта обязательно');
+          return;
+        }
+        if (!variant.description.trim()) {
+          toast.error('Описание варианта обязательно');
+          return;
+        }
+        // Цена может быть не указана (price по запросу)
+        if (variant.price !== undefined && variant.price <= 0) {
+          toast.error('Цена варианта должна быть больше 0 или не указана');
+          return;
+        }
+      }
+    }
+    // Базовая цена теперь необязательна
 
-      await onSubmit({
+    try {
+      // Подготавливаем данные для отправки
+      const submitData = {
         ...formData,
-        image: imageUrl,
-        // Исключаем price если используются варианты
-        ...(useVariants ? {} : { price: formData.price }),
-        // Исключаем variants если не используются
-        ...(useVariants ? { variants: formData.variants } : {}),
-      });
-    } catch (error: any) {
-      console.error('Ошибка создания кэмпа:', error);
-      toast.error(error.message || 'Не удалось создать кэмп');
+        // Убираем неиспользуемые поля
+        ...(useVariants ? { price: undefined } : { variants: undefined }),
+      };
+
+      await onSubmit(submitData);
+    } catch (error) {
+      console.error('Ошибка сохранения кэмпа:', error);
     }
   };
 
@@ -197,10 +239,10 @@ export const CampForm: React.FC<CampFormProps> = ({
     }
   };
 
-  const removeFeature = (index: number) => {
+  const removeFeature = (feature: string) => {
     setFormData(prev => ({
       ...prev,
-      features: prev.features.filter((_, i) => i !== index)
+      features: prev.features.filter(f => f !== feature)
     }));
   };
 
@@ -214,32 +256,18 @@ export const CampForm: React.FC<CampFormProps> = ({
     }
   };
 
-  const removeIncluded = (index: number) => {
+  const removeIncluded = (item: string) => {
     setFormData(prev => ({
       ...prev,
-      included: prev.included.filter((_, i) => i !== index)
+      included: prev.included.filter(i => i !== item)
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      // Создаем временный URL для превью
-      const previewUrl = URL.createObjectURL(file);
-      setFormData(prev => ({ ...prev, image: previewUrl }));
-    }
-  };
-
   const addVariant = () => {
-    const variantCount = formData.variants?.length || 0;
-    const defaultNames = ['Стандарт', 'Премиум', 'VIP', 'Делюкс', 'Эконом'];
-    const defaultDescriptions = ['Базовый пакет', 'Расширенный пакет', 'Премиум пакет', 'Делюкс пакет', 'Эконом пакет'];
-    
     const newVariant: CampVariant = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: defaultNames[variantCount] || `Вариант ${variantCount + 1}`,
-      description: defaultDescriptions[variantCount] || `Пакет ${variantCount + 1}`,
+      id: Date.now().toString(),
+      name: '',
+      description: '',
       price: 0,
     };
     setFormData(prev => ({
@@ -248,371 +276,108 @@ export const CampForm: React.FC<CampFormProps> = ({
     }));
   };
 
-  const updateVariant = (id: string, field: keyof CampVariant, value: string | number) => {
+  const removeVariant = (variantId: string) => {
     setFormData(prev => ({
       ...prev,
-      variants: prev.variants?.map(variant =>
-        variant.id === id
-          ? { ...variant, [field]: value }
-          : variant
+      variants: prev.variants?.filter(v => v.id !== variantId) || []
+    }));
+  };
+
+  const updateVariant = (variantId: string, field: keyof CampVariant, value: string | number | undefined) => {
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants?.map(v => 
+        v.id === variantId ? { ...v, [field]: value } : v
       ) || []
     }));
   };
 
-  const removeVariant = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      variants: prev.variants?.filter(variant => variant.id !== id) || []
-    }));
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      // Здесь можно добавить логику для загрузки файла
+      toast.info('Функция загрузки файлов в разработке');
+    }
   };
 
+  // Проверяем, загружены ли все необходимые данные для редактирования
+  const isDataLoading = isEditing && (loadingOrganizers || loadingTypes);
+
   return (
-    <Card className="max-w-4xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Plus className="h-5 w-5" />
-          {isEditing ? 'Редактирование кэмпа' : 'Создание нового кэмпа'}
+          {isEditing ? 'Редактировать кэмп' : 'Создать новый кэмп'}
         </CardTitle>
         <CardDescription>
           {isEditing 
-            ? 'Обновите информацию о кэмпе. Все поля, отмеченные *, обязательны для заполнения.'
-            : 'Заполните информацию о кэмпе. Все поля, отмеченные *, обязательны для заполнения.'
+            ? 'Измените информацию о кэмпе'
+            : 'Заполните информацию для создания нового кэмпа'
           }
         </CardDescription>
       </CardHeader>
+      
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {isDataLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+            <span>Загрузка данных...</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
           {/* Основная информация */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title" className="mb-2 block">Название кэмпа *</Label>
-                <Input
-                  id="title"
-                  placeholder="Например: IT-буткэмп Tech Retreat"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="organizer" className="mb-2 block">Организатор *</Label>
-                <Input
-                  id="organizer"
-                  placeholder="Название организации"
-                  value={formData.organizer}
-                  onChange={(e) => setFormData(prev => ({ ...prev, organizer: e.target.value }))}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="location" className="mb-2 block">Местоположение *</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="location"
-                    placeholder="Город, адрес или регион"
-                    value={formData.location}
-                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    className="pl-10"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="ageGroup" className="mb-2 block">Возрастная группа *</Label>
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="ageGroup"
-                    placeholder="Например: 14+ лет или Все возрасты"
-                    value={formData.ageGroup}
-                    onChange={(e) => setFormData(prev => ({ ...prev, ageGroup: e.target.value }))}
-                    className="pl-10"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="title" className="mb-2 block">Название кэмпа *</Label>
+              <Input
+                id="title"
+                placeholder="Введите название кэмпа"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                disabled={isLoading}
+                className="cursor-text"
+              />
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="type" className="mb-2 block">Тип кэмпа</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: CampType) => setFormData(prev => ({ ...prev, type: value }))}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите тип кэмпа" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {campTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="difficulty" className="mb-2 block">Сложность</Label>
-                <Select
-                  value={formData.difficulty}
-                  onValueChange={(value: CampDifficulty) => setFormData(prev => ({ ...prev, difficulty: value }))}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите сложность" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {difficulties.map((difficulty) => (
-                      <SelectItem key={difficulty} value={difficulty}>
-                        {difficulty}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Ценообразование */}
-              <div>
-                <Label className="mb-3 block">Ценообразование *</Label>
-                <div className="space-y-4">
-                  {/* Переключатель между простой ценой и вариантами */}
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={!useVariants ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => {
-                          setUseVariants(false);
-                          setFormData(prev => ({ ...prev, variants: [] }));
-                        }}
-                        disabled={isLoading}
-                      >
-                        Фиксированная цена
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={useVariants ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => {
-                          setUseVariants(true);
-                          setFormData(prev => ({ ...prev, price: undefined }));
-                          // Добавляем первый вариант автоматически
-                          if (!formData.variants || formData.variants.length === 0) {
-                            const firstVariant: CampVariant = {
-                              id: Math.random().toString(36).substr(2, 9),
-                              name: 'Стандарт',
-                              description: 'Базовый пакет',
-                              price: 0,
-                            };
-                            setFormData(prev => ({
-                              ...prev,
-                              variants: [firstVariant]
-                            }));
-                          }
-                        }}
-                        disabled={isLoading}
-                      >
-                        Варианты участия
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {!useVariants 
-                        ? 'Одна цена для всех участников'
-                        : 'Разные варианты участия с разными ценами (например: Стандарт, Премиум, VIP)'
-                      }
-                    </p>
-                  </div>
-
-                  {/* Простая цена */}
-                  {!useVariants && (
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">₽</span>
-                        <Input
-                          id="price"
-                          type="number"
-                          min="0"
-                          placeholder="85000"
-                          value={formData.price || ''}
-                          onChange={(e) => setFormData(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
-                          className="pl-8"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Укажите стоимость участия в рублях
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Варианты */}
-                  {useVariants && (
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800">
-                          💡 <strong>Варианты участия</strong> позволяют предложить разные пакеты услуг. 
-                          Например: "Стандарт" (50,000₽), "Премиум" (75,000₽), "VIP" (100,000₽)
-                        </p>
-                      </div>
-                      
-                      {formData.variants?.map((variant, index) => (
-                        <Card key={variant.id} className="p-4 border-l-4 border-l-blue-500">
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="text-sm font-medium text-blue-700">
-                              Вариант {index + 1}
-                            </h4>
-                            {formData.variants && formData.variants.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeVariant(variant.id)}
-                                disabled={isLoading}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                              <Label className="text-xs font-medium">Название *</Label>
-                              <Input
-                                placeholder="Стандарт"
-                                value={variant.name}
-                                onChange={(e) => updateVariant(variant.id, 'name', e.target.value)}
-                                disabled={isLoading}
-                                className="mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs font-medium">Описание *</Label>
-                              <Input
-                                placeholder="Базовый пакет"
-                                value={variant.description}
-                                onChange={(e) => updateVariant(variant.id, 'description', e.target.value)}
-                                disabled={isLoading}
-                                className="mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs font-medium">Цена (₽) *</Label>
-                              <div className="relative mt-1">
-                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">₽</span>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  placeholder="50000"
-                                  value={variant.price || ''}
-                                  onChange={(e) => updateVariant(variant.id, 'price', parseInt(e.target.value) || 0)}
-                                  className="pl-8"
-                                  disabled={isLoading}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={addVariant}
-                        disabled={isLoading}
-                        className="w-full border-dashed border-2 hover:border-blue-300 hover:bg-blue-50"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Добавить вариант участия
-                      </Button>
-                      
-                      {formData.variants && formData.variants.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Добавлено вариантов: {formData.variants.length}. 
-                          На странице кэмпа будет показан диапазон цен от минимальной до максимальной.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Изображение */}
-              <div>
-                <Label className="mb-2 block">Изображение кэмпа</Label>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={imageInputType === 'url' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setImageInputType('url')}
-                      disabled={isLoading}
-                    >
-                      <LinkIcon className="h-4 w-4 mr-1" />
-                      URL
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={imageInputType === 'file' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setImageInputType('file')}
-                      disabled={isLoading}
-                    >
-                      <Upload className="h-4 w-4 mr-1" />
-                      Файл
-                    </Button>
-                  </div>
-
-                  {imageInputType === 'url' ? (
-                    <Input
-                      placeholder="https://example.com/image.jpg"
-                      value={formData.image}
-                      onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
-                      disabled={isLoading}
-                    />
-                  ) : (
-                    <div>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        disabled={isLoading}
-                        className="file:mr-2 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                      />
-                      {selectedFile && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Выбран файл: {selectedFile.name}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {formData.image && (
-                    <div className="mt-2">
-                      <img
-                        src={formData.image}
-                        alt="Превью изображения"
-                        className="w-full h-32 object-cover rounded-md border"
-                        onError={() => toast.error('Не удалось загрузить изображение')}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div>
+              <Label htmlFor="organizer" className="mb-2 block">Организатор *</Label>
+              <Select
+                key={formData.organizerId + '-' + organizers.map(o => o.id).join(',')}
+                value={formData.organizerId}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, organizerId: value }))}
+                disabled={isLoading || loadingOrganizers}
+              >
+                <SelectTrigger className="cursor-pointer">
+                  <SelectValue placeholder={loadingOrganizers ? 'Загрузка...' : (formData.organizerId ? organizers.find(o => String(o.id).trim() === String(formData.organizerId).trim())?.name : 'Выберите организатора')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizers.map((org) => (
+                    <SelectItem key={org.id} value={org.id} className="cursor-pointer">
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errorOrganizers && <div className="text-destructive text-sm mt-1">Ошибка загрузки организаторов</div>}
             </div>
           </div>
 
+          <div>
+            <Label htmlFor="description" className="mb-2 block">Описание кэмпа *</Label>
+            <Textarea
+              id="description"
+              placeholder="Подробное описание программы кэмпа, что ждет участников"
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              disabled={isLoading}
+              rows={4}
+              className="cursor-text"
+            />
+          </div>
+
           {/* Даты */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label className="mb-2 block">Дата начала *</Label>
               <Popover>
@@ -620,27 +385,21 @@ export const CampForm: React.FC<CampFormProps> = ({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal cursor-pointer",
                       !formData.startDate && "text-muted-foreground"
                     )}
                     disabled={isLoading}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.startDate ? (
-                      format(formData.startDate, "dd MMMM yyyy", { locale: ru })
-                    ) : (
-                      <span>Выберите дату начала</span>
-                    )}
+                    {formData.startDate ? format(formData.startDate, "PPP", { locale: ru }) : <span>Выберите дату</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
                     selected={formData.startDate}
-                    onSelect={(date) => setFormData(prev => ({ ...prev, startDate: date || new Date() }))}
-                    disabled={isLoading}
+                    onSelect={(date) => date && setFormData(prev => ({ ...prev, startDate: date }))}
                     initialFocus
-                    locale={ru}
                   />
                 </PopoverContent>
               </Popover>
@@ -653,129 +412,403 @@ export const CampForm: React.FC<CampFormProps> = ({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal cursor-pointer",
                       !formData.endDate && "text-muted-foreground"
                     )}
                     disabled={isLoading}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.endDate ? (
-                      format(formData.endDate, "dd MMMM yyyy", { locale: ru })
-                    ) : (
-                      <span>Выберите дату окончания</span>
-                    )}
+                    {formData.endDate ? format(formData.endDate, "PPP", { locale: ru }) : <span>Выберите дату</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
                     selected={formData.endDate}
-                    onSelect={(date) => setFormData(prev => ({ ...prev, endDate: date || new Date() }))}
-                    disabled={isLoading}
+                    onSelect={(date) => date && setFormData(prev => ({ ...prev, endDate: date }))}
                     initialFocus
-                    locale={ru}
                   />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
 
-          {/* Описание */}
-          <div>
-            <Label htmlFor="description" className="mb-2 block">Описание *</Label>
-            <Textarea
-              id="description"
-              placeholder="Подробное описание кэмпа, программы, что входит в стоимость..."
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={4}
-              disabled={isLoading}
-            />
+          {/* Местоположение и ссылка на кэмп */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="location" className="mb-2 block">Местоположение *</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="location"
+                  placeholder="Например: Подмосковье, база отдыха 'Березки'"
+                  value={formData.location}
+                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                  className="pl-10 cursor-text"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="campUrl" className="mb-2 block">Ссылка на кэмп *</Label>
+              <div className="relative">
+                <Input
+                  id="campUrl"
+                  placeholder="https://example.com/camp"
+                  value={formData.campUrl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, campUrl: e.target.value }))}
+                  className="cursor-text"
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Введите полную ссылку на страницу кэмпа (например, https://example.com/camp)
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="directBooking" className="mb-2 block">Прямое бронирование</Label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="directBooking"
+                  checked={formData.directBooking}
+                  onChange={(e) => setFormData(prev => ({ ...prev, directBooking: e.target.checked }))}
+                  disabled={isLoading}
+                  className="cursor-pointer"
+                />
+                <Label htmlFor="directBooking" className="cursor-pointer text-sm">
+                  Разрешить прямое бронирование на сайте
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Если включено, пользователи смогут оставлять заявки на бронирование прямо на сайте
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="type" className="mb-2 block">Тип кэмпа *</Label>
+              <Select
+                key={`type-${formData.type}`}
+                value={formData.type}
+                onValueChange={(value: CampType) => setFormData(prev => ({ ...prev, type: value }))}
+                disabled={isLoading || loadingTypes}
+              >
+                <SelectTrigger className="cursor-pointer">
+                  <SelectValue placeholder={formData.type ? formData.type : "Не указано"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTypes.map((type) => (
+                    <SelectItem key={type} value={type} className="cursor-pointer">
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Ценообразование */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                id="singlePrice"
+                checked={!useVariants}
+                onChange={() => setUseVariants(false)}
+                disabled={isLoading}
+                className="cursor-pointer"
+              />
+              <Label htmlFor="singlePrice" className="cursor-pointer">Базовая цена</Label>
+              
+              <input
+                type="radio"
+                id="variants"
+                checked={useVariants}
+                onChange={() => setUseVariants(true)}
+                disabled={isLoading}
+                className="cursor-pointer"
+              />
+              <Label htmlFor="variants" className="cursor-pointer">Варианты участия</Label>
+            </div>
+
+            {!useVariants ? (
+              <div>
+                <Label htmlFor="price" className="mb-2 block">Базовая цена (₽)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  placeholder="Введите стоимость участия (или оставьте пустым для 'цена по запросу')"
+                  value={formData.price || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      price: value === '' ? undefined : parseFloat(value) || undefined 
+                    }));
+                  }}
+                  disabled={isLoading}
+                  className="cursor-text"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Если цена не указана, будет отображаться "Цена по запросу"
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Варианты участия *</Label>
+                  <Button
+                    type="button"
+                    onClick={addVariant}
+                    disabled={isLoading}
+                    size="sm"
+                    className="cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Добавить вариант
+                  </Button>
+                </div>
+                
+                {formData.variants?.map((variant, index) => (
+                  <div key={variant.id} className="p-4 border rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Вариант {index + 1}</h4>
+                      <Button
+                        type="button"
+                        onClick={() => removeVariant(variant.id)}
+                        disabled={isLoading}
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive cursor-pointer"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Название *</Label>
+                          <Input
+                            placeholder="Например: Стандарт"
+                            value={variant.name}
+                            onChange={(e) => updateVariant(variant.id, 'name', e.target.value)}
+                            disabled={isLoading}
+                            className="cursor-text"
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">Цена (₽)</Label>
+                          <Input
+                            type="number"
+                            placeholder="Оставьте пустым для 'цена по запросу'"
+                            value={variant.price || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              updateVariant(variant.id, 'price', value === '' ? undefined : parseFloat(value) || undefined);
+                            }}
+                            disabled={isLoading}
+                            className="cursor-text"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="mb-2 block">Описание *</Label>
+                        <Textarea
+                          placeholder="Краткое описание"
+                          value={variant.description}
+                          onChange={(e) => updateVariant(variant.id, 'description', e.target.value)}
+                          disabled={isLoading}
+                          className="cursor-text min-h-[80px] w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Изображение */}
+          <div className="space-y-4">
+            <Label>Изображение кэмпа</Label>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="url"
+                  checked={imageInputType === 'url'}
+                  onChange={() => setImageInputType('url')}
+                  disabled={isLoading}
+                  className="cursor-pointer"
+                />
+                <Label htmlFor="url" className="cursor-pointer">URL</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="file"
+                  checked={imageInputType === 'file'}
+                  onChange={() => setImageInputType('file')}
+                  disabled={isLoading}
+                  className="cursor-pointer"
+                />
+                <Label htmlFor="file" className="cursor-pointer">Файл</Label>
+              </div>
+            </div>
+            
+            {imageInputType === 'url' ? (
+              <div className="relative">
+                <Input
+                  placeholder="https://example.com/image.jpg"
+                  value={formData.image}
+                  onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
+                  disabled={isLoading}
+                  className="cursor-text"
+                />
+              </div>
+            ) : (
+              <div className="relative">
+                <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  disabled={isLoading}
+                  className="pl-10 cursor-pointer"
+                />
+              </div>
+            )}
           </div>
 
           {/* Особенности */}
-          <div>
-            <Label className="mb-3 block">Особенности и удобства</Label>
-            <div className="flex gap-2 mb-3">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Особенности кэмпа</Label>
+              <Button
+                type="button"
+                onClick={addFeature}
+                disabled={isLoading || !newFeature.trim()}
+                size="sm"
+                className="cursor-pointer"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Добавить
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-2">
               <Input
-                placeholder="Добавить особенность"
+                placeholder="Например: Wi-Fi, бассейн, спортзал"
                 value={newFeature}
                 onChange={(e) => setNewFeature(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
                 disabled={isLoading}
+                className="cursor-text"
               />
-              <Button type="button" onClick={addFeature} disabled={isLoading}>
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {formData.features.map((feature, index) => (
-                <Badge key={index} variant="secondary" className="text-sm">
-                  {feature}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="ml-1 p-0 h-auto"
-                    onClick={() => removeFeature(index)}
-                    disabled={isLoading}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
+            
+            {formData.features.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {formData.features.map((feature, index) => (
+                  <Badge key={index} variant="secondary" className="cursor-default">
+                    {feature}
+                    <button
+                      type="button"
+                      onClick={() => removeFeature(feature)}
+                      disabled={isLoading}
+                      className="ml-1 hover:text-destructive cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Что включено */}
-          <div>
-            <Label className="mb-3 block">Что включено в стоимость</Label>
-            <div className="flex gap-2 mb-3">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Что включено в стоимость</Label>
+              <Button
+                type="button"
+                onClick={addIncluded}
+                disabled={isLoading || !newIncluded.trim()}
+                size="sm"
+                className="cursor-pointer"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Добавить
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-2">
               <Input
-                placeholder="Добавить услугу"
+                placeholder="Например: Проживание, питание, трансфер"
                 value={newIncluded}
                 onChange={(e) => setNewIncluded(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addIncluded())}
                 disabled={isLoading}
+                className="cursor-text"
               />
-              <Button type="button" onClick={addIncluded} disabled={isLoading}>
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {formData.included.map((item, index) => (
-                <Badge key={index} variant="outline" className="text-sm">
-                  {item}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="ml-1 p-0 h-auto"
-                    onClick={() => removeIncluded(index)}
-                    disabled={isLoading}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
+            
+            {formData.included.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {formData.included.map((item, index) => (
+                  <Badge key={index} variant="outline" className="cursor-default">
+                    {item}
+                    <button
+                      type="button"
+                      onClick={() => removeIncluded(item)}
+                      disabled={isLoading}
+                      className="ml-1 hover:text-destructive cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Кнопки */}
-          <div className="flex gap-3 pt-6">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading 
-                ? (isEditing ? 'Обновление...' : 'Создание...') 
-                : (isEditing ? 'Обновить кэмп' : 'Создать кэмп')
-              }
-            </Button>
+          <div className="flex gap-3 justify-end">
             {onCancel && (
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={isLoading}
+                className="cursor-pointer"
+              >
                 Отмена
               </Button>
             )}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Сохранение...
+                </>
+              ) : (
+                <>
+                  {isEditing ? 'Сохранить изменения' : 'Создать кэмп'}
+                </>
+              )}
+            </Button>
           </div>
         </form>
+        )}
       </CardContent>
     </Card>
   );

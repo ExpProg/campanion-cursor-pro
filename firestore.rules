@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow public read access to camps and camp types
+    match /camps/{document} {
+      allow read: if true; // Anyone can read camps
+      allow write: if request.auth != null; // Only authenticated users can write
+    }
+    
+    match /campTypes/{document} {
+      allow read: if true; // Anyone can read camp types
+      allow write: if request.auth != null; // Only authenticated users can write
+    }
+    
+    // Allow public read access to organizers
+    match /organizers/{document} {
+      allow read: if true; // Anyone can read organizers
+      allow write: if request.auth != null; // Only authenticated users can write
+    }
+    
+    // Allow public read access to events
+    match /events/{document} {
+      allow read: if true; // Anyone can read events
+      allow write: if request.auth != null; // Only authenticated users can write
+    }
+    
+    // Allow authenticated users to read and write booking requests
+    match /bookingRequests/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read and write users
+    match /users/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Default rule: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 

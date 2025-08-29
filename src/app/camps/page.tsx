@@ -3,12 +3,14 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { CampCard } from '@/components/CampCard';
 import { useCamps } from '@/hooks/useCamps';
+import { useAuthRole } from '@/hooks/useRole';
 import { Camp } from '@/types/camp';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/ui/date-picker';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Mountain, Loader2, RefreshCw, AlertCircle, MapPin, X, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Mountain, Loader2, RefreshCw, AlertCircle, MapPin, X, ChevronDown, ChevronUp, Filter, Archive } from 'lucide-react';
 
 export default function CampsPage() {
   const [locationInput, setLocationInput] = useState<string>('');
@@ -20,9 +22,11 @@ export default function CampsPage() {
   const [priceFrom, setPriceFrom] = useState<string>('');
   const [priceTo, setPriceTo] = useState<string>('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showArchivedCamps, setShowArchivedCamps] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   
-  const { camps, loading, error, refetch } = useCamps();
+  const { camps, allCamps, loading, error, refetch } = useCamps();
+  const { isAdmin } = useAuthRole();
 
   // Получаем уникальные места
   const uniqueLocations = useMemo(() => {
@@ -38,9 +42,12 @@ export default function CampsPage() {
     );
   }, [uniqueLocations, locationInput]);
 
+  // Выбираем список кэмпов для фильтрации
+  const campsToFilter = showArchivedCamps && isAdmin ? allCamps : camps;
+
   // Фильтрация кэмпов
   const filteredCamps = useMemo(() => {
-    return camps.filter((camp: Camp) => {
+    return campsToFilter.filter((camp: Camp) => {
       const matchesLocation = !locationInput || camp.location.toLowerCase().includes(locationInput.toLowerCase());
       
       const matchesStartDate = !startDate || camp.startDate >= startDate;
@@ -84,7 +91,7 @@ export default function CampsPage() {
 
       return matchesLocation && matchesStartDate && matchesEndDate && matchesMonths && matchesCategories && matchesPriceFrom && matchesPriceTo;
     });
-  }, [camps, locationInput, startDate, endDate, selectedMonths, selectedCategories, priceFrom, priceTo]);
+  }, [campsToFilter, locationInput, startDate, endDate, selectedMonths, selectedCategories, priceFrom, priceTo]);
 
   // Названия месяцев
   const months = [
@@ -143,9 +150,10 @@ export default function CampsPage() {
     setPriceFrom('');
     setPriceTo('');
     setShowSuggestions(false);
+    setShowArchivedCamps(false);
   };
 
-  const hasActiveFilters = locationInput || startDate || endDate || selectedMonths.length > 0 || selectedCategories.length > 0 || priceFrom || priceTo;
+  const hasActiveFilters = locationInput || startDate || endDate || selectedMonths.length > 0 || selectedCategories.length > 0 || priceFrom || priceTo || (isAdmin && showArchivedCamps);
 
 
 
@@ -236,6 +244,20 @@ export default function CampsPage() {
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           Откройте новые горизонты для себя и своих близких! Выберите идеальный кэмп из нашей коллекции программ для развития, обучения и незабываемого отдыха для всех возрастов.
         </p>
+        
+        {/* Счетчик кэмпов */}
+        <div className="mt-4 text-sm text-muted-foreground">
+          {isAdmin ? (
+            <span>
+              Показано {filteredCamps.length} из {allCamps.length} кэмпов
+              {showArchivedCamps && ' (включая архивные)'}
+            </span>
+          ) : (
+            <span>Найдено {filteredCamps.length} кэмпов</span>
+          )}
+        </div>
+        
+
       </div>
 
       {/* Фильтры поиска */}
@@ -551,6 +573,36 @@ export default function CampsPage() {
 
 
       </div>
+
+      {/* Фильтр для администраторов */}
+      {isAdmin && (
+        <div className="mb-6 p-4 bg-muted/30 border border-border rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Archive className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium text-sm">Управление архивными кэмпами</span>
+            </div>
+            <Button
+              variant={showArchivedCamps ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowArchivedCamps(!showArchivedCamps)}
+              className="flex items-center gap-2"
+            >
+              {showArchivedCamps ? 'Скрыть архивные' : 'Показать все кэмпы'}
+            </Button>
+          </div>
+          {showArchivedCamps && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Показано {filteredCamps.length} из {allCamps.length} кэмпов (включая архивные)</span>
+                <Badge variant="secondary" className="text-xs">
+                  Архивные: {allCamps.filter(camp => camp.status === 'archived').length}
+                </Badge>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Результаты */}
       <div className="mb-6">

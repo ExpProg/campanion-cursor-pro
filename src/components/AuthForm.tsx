@@ -10,9 +10,10 @@ import { toast } from 'sonner';
 
 interface AuthFormProps {
   onClose?: () => void;
+  onSuccess?: () => void;
 }
 
-export const AuthForm: React.FC<AuthFormProps> = ({ onClose }) => {
+export const AuthForm: React.FC<AuthFormProps> = ({ onClose, onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +37,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onClose }) => {
         await register(email, password, displayName);
         toast.success('Аккаунт создан!');
       }
+      onSuccess?.();
       onClose?.();
     } catch (error: any) {
       const errorMessage = error.code === 'auth/user-not-found' 
@@ -61,6 +63,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onClose }) => {
     try {
       await loginWithGoogle();
       toast.success('Успешный вход через Google!');
+      onSuccess?.();
       onClose?.();
     } catch (error: any) {
       const errorMessage = error.code === 'auth/popup-closed-by-user'
