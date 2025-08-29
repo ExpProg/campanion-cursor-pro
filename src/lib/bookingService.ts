@@ -92,3 +92,19 @@ export const getBookingRequestsByCampId = async (campId: string): Promise<Bookin
   }
 };
 
+export const checkUserBookingExists = async (campId: string, userContact: string): Promise<boolean> => {
+  try {
+    const q = query(
+      collection(db, COLLECTION_NAME), 
+      where('campId', '==', campId),
+      where('contact', '==', userContact)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking user booking:', error);
+    return false; // В случае ошибки считаем, что заявки нет
+  }
+};
+

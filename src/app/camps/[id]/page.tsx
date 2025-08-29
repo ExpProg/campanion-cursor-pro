@@ -14,9 +14,10 @@ import { ru } from 'date-fns/locale';
 import Image from 'next/image';
 import { getCampTypeColorClass, getDifficultyColorClass, getLogoPlaceholderColor, getInitials } from '@/lib/utils';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
-import { createBookingRequest } from '@/lib/bookingService';
+import { useState, useEffect } from 'react';
+import { createBookingRequest, checkUserBookingExists } from '@/lib/bookingService';
 import { toast } from 'sonner';
+import { BookingModal } from '@/components/BookingModal';
 
 export default function CampDetailPage() {
   const params = useParams();
@@ -26,10 +27,31 @@ export default function CampDetailPage() {
   const { user, userProfile } = useAuth();
   const { isAuthenticated, isAdmin } = useAuthRole();
   const [isBooking, setIsBooking] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [hasExistingBooking, setHasExistingBooking] = useState(false);
 
   // Ищем кэмп сначала в активных, затем во всех кэмпах (для архивных)
   const camp = camps.find(c => c.id === campId) || allCamps.find(c => c.id === campId);
   const { organizer, loading: loadingOrganizer } = useOrganizer(camp?.organizerId || null);
+
+  // Проверка, должен ли кэмп считаться архивным (по дате)
+  const isCampArchived = () => {
+    if (!camp) return false;
+    const now = new Date();
+    return camp.startDate <= now;
+  };
+
+  // Отладочная информация
+  console.log('Camp detail page state:', {
+    campId,
+    campStatus: camp?.status,
+    isArchivedByDate: isCampArchived(),
+    startDate: camp?.startDate,
+    currentDate: new Date(),
+    isAdmin,
+    user: user?.email,
+    hasExistingBooking
+  });
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU').format(price);
@@ -50,8 +72,8 @@ export default function CampDetailPage() {
     }
     
     // Если есть базовая цена, показываем её
-    if (camp?.price) {
-      return `${formatPrice(camp.price)} ₽`;
+    if (camp?.price !== undefined && camp.price !== null) {
+      return `${formatPrice(camp.price as number)} ₽`;
     }
     
     return 'Цена не указана';
@@ -64,54 +86,91 @@ export default function CampDetailPage() {
     return diffDays;
   };
 
-  // Обработка прямого бронирования
-  const handleDirectBooking = async () => {
-    if (!camp || !user || !userProfile) return;
-    
-    setIsBooking(true);
-    try {
-      await createBookingRequest({
-        campId: camp.id,
-        campTitle: camp.title,
-        name: userProfile.displayName || user.displayName || user.email || 'Неизвестно',
-        contact: user.email || '',
-        message: `Заявка на бронирование кэмпа "${camp.title}"`,
-      });
+  // Проверка существующих заявок пользователя
+  useEffect(() => {
+    const checkExistingBooking = async () => {
+      if (!camp || !user?.email) return;
       
-      toast.success('Заявка на бронирование отправлена!');
-    } catch (error) {
-      console.error('Ошибка при создании заявки:', error);
-      toast.error('Не удалось отправить заявку. Попробуйте позже.');
-    } finally {
-      setIsBooking(false);
-    }
-  };
+      try {
+        const hasBooking = await checkUserBookingExists(camp.id, user.email);
+        setHasExistingBooking(hasBooking);
+      } catch (error) {
+        console.error('Ошибка при проверке заявок:', error);
+      }
+    };
 
-  // Обработка перехода на внешний сайт
-  const handleExternalBooking = () => {
-    if (camp?.campUrl) {
-      window.open(camp.campUrl, '_blank');
-    }
-  };
+    checkExistingBooking();
+  }, [camp, user]);
 
-  // Обработка бронирования в зависимости от типа
+  // Обработка бронирования
   const handleBooking = () => {
-    // Проверяем, не архивный ли кэмп
-    if (camp?.status === 'archived') {
-      toast.error('Бронирование архивных кэмпов недоступно');
+    if (!camp) return;
+    
+    // Если кэмп в архиве (по дате) и пользователь не администратор, блокируем
+    if (isCampArchived() && !isAdmin) {
       return;
     }
 
-    if (!isAuthenticated) {
-      router.push('/auth?redirect=' + encodeURIComponent(`/camps/${campId}`));
+    // Если у пользователя уже есть заявка, показываем сообщение
+    if (hasExistingBooking) {
+      toast.info('Вы уже откликнулись на этот кэмп');
       return;
     }
 
-    if (camp?.directBooking) {
-      handleDirectBooking();
-    } else {
-      handleExternalBooking();
+    // Открываем модальное окно бронирования
+    setShowBookingModal(true);
+  };
+
+  // Получение текста кнопки
+  const getButtonText = () => {
+    const archived = isCampArchived();
+    
+    console.log('getButtonText check:', {
+      campStatus: camp?.status,
+      isArchivedByDate: archived,
+      hasExistingBooking
+    });
+    
+    if (archived) {
+      console.log('Button text: Бронирование недоступно');
+      return 'Бронирование недоступно';
     }
+    
+    if (hasExistingBooking) {
+      console.log('Button text: Вы уже откликнулись');
+      return 'Вы уже откликнулись';
+    }
+    
+    console.log('Button text: Забронировать кэмп');
+    return 'Забронировать кэмп';
+  };
+
+  // Проверка, должна ли кнопка быть заблокирована
+  const isButtonDisabled = () => {
+    const archived = isCampArchived();
+    
+    console.log('isButtonDisabled check:', {
+      campStatus: camp?.status,
+      isArchivedByDate: archived,
+      isAdmin,
+      hasExistingBooking,
+      campId: camp?.id,
+      startDate: camp?.startDate,
+      currentDate: new Date()
+    });
+    
+    if (archived && !isAdmin) {
+      console.log('Button disabled: archived camp (by date) and not admin');
+      return true; // Заблокирована для обычных пользователей
+    }
+    
+    if (hasExistingBooking) {
+      console.log('Button disabled: existing booking');
+      return true; // Заблокирована если уже есть заявка
+    }
+    
+    console.log('Button enabled');
+    return false; // Активна для администраторов
   };
 
   if (loading) {
@@ -173,7 +232,7 @@ export default function CampDetailPage() {
         </Button>
         
         {/* Информация о статусе для администраторов */}
-        {isAdmin && camp.status === 'archived' && (
+        {isAdmin && isCampArchived() && (
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Статус:</span>
             <Badge 
@@ -288,64 +347,67 @@ export default function CampDetailPage() {
                     <p className="text-sm text-muted-foreground">{camp.location}</p>
                   </div>
                 </div>
-                
-
               </div>
 
-
-
-              {/* Варианты (если есть) */}
+              {/* Варианты программы */}
               {camp.variants && camp.variants.length > 0 && (
                 <div>
-                  <h3 className="font-medium mb-3">Варианты участия</h3>
-                  <div className="space-y-3">
-                    {camp.variants.map((variant) => (
-                      <Card key={variant.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-lg">{variant.name}</h4>
-                            <p className="text-muted-foreground text-sm mt-1">{variant.description}</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-primary">
-                              {formatPrice(variant.price)} ₽
-                            </div>
-                          </div>
+                  <h4 className="font-medium mb-3">Варианты программы</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {camp.variants.map((variant, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h5 className="font-medium">{variant.name}</h5>
+                          <span className="font-bold text-primary">{formatPrice(variant.price)} ₽</span>
                         </div>
-                      </Card>
+                        {variant.description && (
+                          <p className="text-sm text-muted-foreground">{variant.description}</p>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
 
-              {/* Организатор */}
-              <div>
-                <h3 className="font-medium mb-2">Организатор</h3>
-                {loadingOrganizer ? (
-                  <p className="text-muted-foreground">Загрузка информации об организаторе...</p>
-                ) : organizer ? (
-                  <div className="space-y-3">
-                    {/* Название организатора с аватаркой */}
-                    <div className="flex items-center gap-3">
+          {/* Информация об организаторе */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Об организаторе</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingOrganizer ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : organizer ? (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    {/* Логотип/аватар организатора */}
+                    <div className="flex-shrink-0">
                       {organizer.logo ? (
-                        <img 
-                          src={organizer.logo} 
+                        <img
+                          src={organizer.logo}
                           alt={organizer.name}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                       ) : (
                         <div 
-                          className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-lg font-medium"
-                          style={{ backgroundColor: getLogoPlaceholderColor(organizer.name) }}
+                          className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold text-lg ${getLogoPlaceholderColor(organizer.name)}`}
                         >
                           {getInitials(organizer.name)}
                         </div>
                       )}
-                      <div>
+                    </div>
+                    
+                    {/* Название и ссылка */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
                         {organizer.website ? (
-                          <a 
-                            href={organizer.website} 
-                            target="_blank" 
+                          <a
+                            href={organizer.website}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-xl font-semibold text-primary hover:underline"
                           >
@@ -356,34 +418,34 @@ export default function CampDetailPage() {
                         )}
                       </div>
                     </div>
-                    
-                    {/* Описание организатора */}
-                    {organizer.description && (
-                      <div className="pl-15">
-                        <p className="text-sm text-muted-foreground">{organizer.description}</p>
+                  </div>
+                  
+                  {/* Описание организатора */}
+                  {organizer.description && (
+                    <div className="pl-16">
+                      <p className="text-sm text-muted-foreground">{organizer.description}</p>
+                    </div>
+                  )}
+                  
+                  {/* Контактная информация */}
+                  <div className="space-y-1 text-sm pl-16">
+                    {organizer.contactEmail && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{organizer.contactEmail}</span>
                       </div>
                     )}
-                    
-                    {/* Контактная информация */}
-                    <div className="space-y-1 text-sm pl-15">
-                      {organizer.contactEmail && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span>{organizer.contactEmail}</span>
-                        </div>
-                      )}
-                      {organizer.contactPhone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span>{organizer.contactPhone}</span>
-                        </div>
-                      )}
-                    </div>
+                    {organizer.contactPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{organizer.contactPhone}</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-muted-foreground">Организатор не указан</p>
-                )}
-              </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Организатор не указан</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -408,77 +470,37 @@ export default function CampDetailPage() {
                 className="w-full" 
                 size="lg"
                 onClick={handleBooking}
-                disabled={isBooking || camp?.status === 'archived'}
-                variant={camp?.status === 'archived' ? 'secondary' : 'default'}
+                disabled={isButtonDisabled()}
+                variant={isButtonDisabled() ? 'secondary' : 'default'}
               >
-                {isBooking ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Обработка...
-                  </>
-                ) : camp?.status === 'archived' ? (
-                  <>
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Бронирование недоступно
-                  </>
-                ) : camp?.directBooking ? (
-                  'Забронировать место'
-                ) : (
-                  <>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Перейти на сайт
-                  </>
-                )}
+                {getButtonText()}
               </Button>
 
-              {/* Информация о типе бронирования */}
+              {/* Информация о статусе */}
               <div className="text-center text-sm text-muted-foreground">
-                {camp?.status === 'archived' ? (
+                {isCampArchived() ? (
                   'Бронирование недоступно (кэмп в архиве)'
-                ) : camp?.directBooking ? (
-                  'Бронирование прямо на сайте'
-                ) : (
-                  'Бронирование на внешнем сайте'
-                )}
-              </div>
-
-              {/* Контактная информация */}
-              <div className="pt-4 border-t space-y-3">
-                <h4 className="font-medium">Нужна консультация?</h4>
-                <div className="space-y-2">
-                  {organizer?.contactEmail && (
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start" 
-                      size="sm"
-                      onClick={() => window.open(`mailto:${organizer.contactEmail}`)}
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      Написать email
-                    </Button>
-                  )}
-                  {organizer?.contactPhone && (
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start" 
-                      size="sm"
-                      onClick={() => window.open(`tel:${organizer.contactPhone}`)}
-                    >
-                      <Phone className="h-4 w-4 mr-2" />
-                      Заказать звонок
-                    </Button>
-                  )}
-                  {!organizer?.contactEmail && !organizer?.contactPhone && (
-                    <p className="text-sm text-muted-foreground text-center">
-                      Контактная информация не указана
-                    </p>
-                  )}
-                </div>
+                ) : hasExistingBooking ? (
+                  'Вы уже откликнулись на этот кэмп'
+                ) : null}
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Модальное окно бронирования */}
+      {camp && (
+        <BookingModal
+          isOpen={showBookingModal}
+          onClose={() => setShowBookingModal(false)}
+          camp={camp}
+          isDirectBooking={camp.directBooking}
+          userEmail={user?.email || undefined}
+          userName={userProfile?.displayName || user?.displayName || undefined}
+          onBookingSuccess={() => setHasExistingBooking(true)}
+        />
+      )}
     </div>
   );
 } 
