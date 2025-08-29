@@ -8,6 +8,7 @@ import { useAuthRole } from '@/hooks/useRole';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar, MapPin, Clock, Star, ArrowLeft, Mail, Phone, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -18,6 +19,7 @@ import { useState, useEffect } from 'react';
 import { createBookingRequest, checkUserBookingExists } from '@/lib/bookingService';
 import { toast } from 'sonner';
 import { BookingModal } from '@/components/BookingModal';
+import { AuthForm } from '@/components/AuthForm';
 
 export default function CampDetailPage() {
   const params = useParams();
@@ -29,6 +31,7 @@ export default function CampDetailPage() {
   const [isBooking, setIsBooking] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [hasExistingBooking, setHasExistingBooking] = useState(false);
+  const [showAuthForm, setShowAuthForm] = useState(false);
 
   // Ищем кэмп сначала в активных, затем во всех кэмпах (для архивных)
   const camp = camps.find(c => c.id === campId) || allCamps.find(c => c.id === campId);
@@ -60,14 +63,16 @@ export default function CampDetailPage() {
   const getPriceDisplay = () => {
     // Если есть варианты, показываем диапазон цен
     if (camp?.variants && camp.variants.length > 0) {
-      const prices = camp.variants.map(v => v.price);
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-      
-      if (minPrice === maxPrice) {
-        return `${formatPrice(minPrice)} ₽`;
-      } else {
-        return `${formatPrice(minPrice)} - ${formatPrice(maxPrice)} ₽`;
+      const prices = camp.variants.map(v => v.price).filter((price): price is number => price !== undefined);
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        
+        if (minPrice === maxPrice) {
+          return `${formatPrice(minPrice)} ₽`;
+        } else {
+          return `${formatPrice(minPrice)} - ${formatPrice(maxPrice)} ₽`;
+        }
       }
     }
     
@@ -102,9 +107,15 @@ export default function CampDetailPage() {
     checkExistingBooking();
   }, [camp, user]);
 
-  // Обработка бронирования
-  const handleBooking = () => {
+  // Обработка клика по кнопке
+  const handleButtonClick = () => {
     if (!camp) return;
+    
+    // Если пользователь не авторизован, показываем форму входа
+    if (!isAuthenticated) {
+      setShowAuthForm(true);
+      return;
+    }
     
     // Если кэмп в архиве (по дате) и пользователь не администратор, блокируем
     if (isCampArchived() && !isAdmin) {
@@ -128,8 +139,15 @@ export default function CampDetailPage() {
     console.log('getButtonText check:', {
       campStatus: camp?.status,
       isArchivedByDate: archived,
-      hasExistingBooking
+      hasExistingBooking,
+      isAuthenticated
     });
+    
+    // Если пользователь не авторизован, показываем кнопку входа
+    if (!isAuthenticated) {
+      console.log('Button text: Войти');
+      return 'Войти';
+    }
     
     if (archived) {
       console.log('Button text: Бронирование недоступно');
@@ -154,10 +172,17 @@ export default function CampDetailPage() {
       isArchivedByDate: archived,
       isAdmin,
       hasExistingBooking,
+      isAuthenticated,
       campId: camp?.id,
       startDate: camp?.startDate,
       currentDate: new Date()
     });
+    
+    // Если пользователь не авторизован, кнопка активна (ведет на форму входа)
+    if (!isAuthenticated) {
+      console.log('Button enabled: not authenticated (shows auth form)');
+      return false;
+    }
     
     if (archived && !isAdmin) {
       console.log('Button disabled: archived camp (by date) and not admin');
@@ -358,7 +383,7 @@ export default function CampDetailPage() {
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <h5 className="font-medium">{variant.name}</h5>
-                          <span className="font-bold text-primary">{formatPrice(variant.price)} ₽</span>
+                          <span className="font-bold text-primary">{variant.price ? `${formatPrice(variant.price)} ₽` : 'Цена не указана'}</span>
                         </div>
                         {variant.description && (
                           <p className="text-sm text-muted-foreground">{variant.description}</p>
@@ -465,11 +490,11 @@ export default function CampDetailPage() {
                 <p className="text-sm text-muted-foreground">за {calculateDuration()} дней</p>
               </div>
 
-              {/* Кнопка бронирования */}
+              {/* Кнопка бронирования/входа */}
               <Button 
                 className="w-full" 
                 size="lg"
-                onClick={handleBooking}
+                onClick={handleButtonClick}
                 disabled={isButtonDisabled()}
                 variant={isButtonDisabled() ? 'secondary' : 'default'}
               >
@@ -501,6 +526,26 @@ export default function CampDetailPage() {
           onBookingSuccess={() => setHasExistingBooking(true)}
         />
       )}
+
+      {/* Модальное окно авторизации */}
+      <Dialog open={showAuthForm} onOpenChange={setShowAuthForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Вход в систему</DialogTitle>
+            <DialogDescription>
+              Войдите в систему или зарегистрируйтесь, чтобы забронировать кэмп
+            </DialogDescription>
+          </DialogHeader>
+          <AuthForm 
+            onClose={() => setShowAuthForm(false)}
+            onSuccess={() => {
+              setShowAuthForm(false);
+              // После успешной авторизации можно показать сообщение
+              toast.success('Добро пожаловать! Теперь вы можете забронировать кэмп');
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
