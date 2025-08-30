@@ -419,7 +419,8 @@ export default function CampDetailPage() {
                         />
                       ) : (
                         <div 
-                          className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold text-lg ${getLogoPlaceholderColor(organizer.name)}`}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-semibold text-sm"
+                          style={{ backgroundColor: organizer.color || getLogoPlaceholderColor(organizer.name) }}
                         >
                           {getInitials(organizer.name)}
                         </div>

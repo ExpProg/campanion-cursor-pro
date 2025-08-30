@@ -169,7 +169,7 @@ export default function OrganizersPage() {
                         ) : (
                           <div 
                             className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold text-lg"
-                            style={{ backgroundColor: getLogoPlaceholderColor(organizer.name) }}
+                            style={{ backgroundColor: organizer.color || getLogoPlaceholderColor(organizer.name) }}
                           >
                             {getInitials(organizer.name)}
                           </div>

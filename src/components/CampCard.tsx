@@ -182,7 +182,9 @@ export function CampCard({ camp }: CampCardProps) {
           <div className="flex items-center gap-2 text-sm">
             <div 
               className="w-5 h-5 rounded-md flex items-center justify-center text-white text-xs font-medium flex-shrink-0 organizer-avatar-square"
-              style={{ backgroundColor: getLogoPlaceholderColor(organizer?.name || '') }}
+              style={{ 
+                backgroundColor: organizer?.color || getLogoPlaceholderColor(organizer?.name || '') 
+              }}
             >
               {getInitials(organizer?.name || '')}
             </div>
