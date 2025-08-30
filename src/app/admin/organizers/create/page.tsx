@@ -49,20 +49,23 @@ export default function CreateOrganizerPage() {
         </p>
       </div>
     }>
-      <div className="container mx-auto px-4 py-8">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Создать организатора</h1>
-            <p className="text-muted-foreground mt-2">
-              Добавьте нового организатора в систему
-            </p>
+      {/* Sticky навигация */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Link href="/admin">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Админ панель
+              </Button>
+            </Link>
+            <div className="h-4 w-px bg-border" />
+            <span className="text-sm text-muted-foreground">Создание организатора</span>
           </div>
-          <Button onClick={handleCancel} variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Назад
-          </Button>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
 
         {/* Форма создания */}
         <OrganizerForm
