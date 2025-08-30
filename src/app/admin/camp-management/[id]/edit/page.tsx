@@ -114,19 +114,15 @@ export default function EditCampPage() {
             <CardContent className="text-center py-12">
               <h1 className="text-2xl font-bold text-destructive mb-4">Кэмп не найден</h1>
               <p className="text-muted-foreground mb-6">
-                Кэмп с указанным ID не существует или был удален.
+                Запрашиваемый кэмп не существует или был удален.
               </p>
               <div className="flex gap-4 justify-center">
-                <Link href="/admin/camps">
-                  <Button variant="outline">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    К списку кэмпов
-                  </Button>
-                </Link>
+                <Button onClick={handleCancel} variant="outline">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Назад
+                </Button>
                 <Link href="/admin">
-                  <Button>
-                    К админ-панели
-                  </Button>
+                  <Button>В админ панель</Button>
                 </Link>
               </div>
             </CardContent>
@@ -146,29 +142,29 @@ export default function EditCampPage() {
       </div>
     }>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/admin/camps">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Назад
-            </Button>
-          </Link>
+        {/* Заголовок */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Редактирование кэмпа</h1>
+            <h1 className="text-3xl font-bold">Редактировать кэмп</h1>
             <p className="text-muted-foreground mt-2">
-              Обновите информацию о кэмпе "{camp?.title}"
+              Измените информацию о кэмпе "{camp?.title}"
             </p>
           </div>
+          <Button onClick={handleCancel} variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Назад
+          </Button>
         </div>
-        
+
+        {/* Форма редактирования */}
         <CampForm
-          initialData={camp}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           isLoading={isSubmitting}
+          initialData={camp}
           isEditing={true}
         />
       </div>
     </AdminOnly>
   );
-} 
+}

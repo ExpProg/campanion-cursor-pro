@@ -305,7 +305,7 @@ export const CampForm: React.FC<CampFormProps> = ({
   const isDataLoading = isEditing && (loadingOrganizers || loadingTypes);
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           {isEditing ? 'Редактировать кэмп' : 'Создать новый кэмп'}

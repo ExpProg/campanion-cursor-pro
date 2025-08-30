@@ -250,6 +250,8 @@ export const AdminPanel = () => {
         </h1>
       </div>
 
+
+
       {/* График количества кэмпов по месяцам */}
       <Card className="mb-6">
         <CardHeader className="pb-3">
@@ -376,7 +378,7 @@ export const AdminPanel = () => {
                            {/* Кнопки создания для разных вкладок */}
               <div className="flex justify-start">
                 {activeTab === 'camps' && (
-                  <Link href="/admin/camps/create">
+                  <Link href="/admin/camp-management/create">
                     <Button size="sm" className="h-8 px-3 text-xs">
                       <Plus className="h-3 w-3 mr-1" />
                       Новый кэмп
@@ -468,7 +470,7 @@ export const AdminPanel = () => {
                             </td>
                             <td className="p-3 text-right">
                               <div className="flex gap-2 justify-end">
-                                <Link href={`/admin/camps/${camp.id}/edit`}>
+                                <Link href={`/admin/camp-management/${camp.id}/edit`}>
                                   <Button variant="outline" size="sm">
                                     <Edit className="h-4 w-4" />
                                   </Button>

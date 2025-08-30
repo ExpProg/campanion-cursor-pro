@@ -7,28 +7,32 @@ import { createCamp } from '@/lib/campService';
 import { CreateCampData } from '@/types/camp';
 import { toast } from 'sonner';
 import { AdminOnly } from '@/components/RoleProtected';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 export default function CreateCampPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (campData: CreateCampData) => {
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
-      console.log('🎯 Создаем новый кэмп:', campData);
+      console.log('✏️ Создаем кэмп:', campData);
       
-      const newCamp = await createCamp(campData);
-      console.log('✅ Кэмп успешно создан:', newCamp);
+      const campId = await createCamp(campData);
+      console.log('✅ Кэмп успешно создан с ID:', campId);
       
       toast.success('Кэмп успешно создан!');
       
-      // Перенаправляем на страницу созданного кэмпа
-      router.push(`/camps/${newCamp.id}`);
+      // Перенаправляем на страницу кэмпа
+      router.push(`/camps/${campId}`);
     } catch (error: any) {
       console.error('❌ Ошибка создания кэмпа:', error);
       toast.error(error.message || 'Не удалось создать кэмп');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -46,19 +50,28 @@ export default function CreateCampPage() {
       </div>
     }>
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Создание нового кэмпа</h1>
-          <p className="text-muted-foreground mt-2">
-            Заполните форму для создания нового кэмпа. Все обязательные поля должны быть заполнены.
-          </p>
+        {/* Заголовок */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">Создать кэмп</h1>
+            <p className="text-muted-foreground mt-2">
+              Добавьте новый кэмп в систему
+            </p>
+          </div>
+          <Button onClick={handleCancel} variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Назад
+          </Button>
         </div>
-        
+
+        {/* Форма создания */}
         <CampForm
           onSubmit={handleSubmit}
           onCancel={handleCancel}
-          isLoading={isLoading}
+          isLoading={isSubmitting}
+          isEditing={false}
         />
       </div>
     </AdminOnly>
   );
-} 
+}
