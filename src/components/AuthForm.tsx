@@ -39,18 +39,19 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onClose, onSuccess }) => {
       }
       onSuccess?.();
       onClose?.();
-    } catch (error: any) {
-      const errorMessage = error.code === 'auth/user-not-found' 
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
+      const errorMessage = err.code === 'auth/user-not-found' 
         ? 'Пользователь не найден'
-        : error.code === 'auth/wrong-password'
+        : err.code === 'auth/wrong-password'
         ? 'Неверный пароль'
-        : error.code === 'auth/email-already-in-use'
+        : err.code === 'auth/email-already-in-use'
         ? 'Email уже используется'
-        : error.code === 'auth/weak-password'
+        : err.code === 'auth/weak-password'
         ? 'Пароль слишком слабый'
-        : error.code === 'auth/invalid-email'
+        : err.code === 'auth/invalid-email'
         ? 'Неверный формат email'
-        : 'Произошла ошибка. Попробуйте снова.';
+        : err.message || 'Произошла ошибка. Попробуйте снова.';
       
       toast.error(errorMessage);
     } finally {
@@ -65,14 +66,15 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onClose, onSuccess }) => {
       toast.success('Успешный вход через Google!');
       onSuccess?.();
       onClose?.();
-    } catch (error: any) {
-      const errorMessage = error.code === 'auth/popup-closed-by-user'
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
+      const errorMessage = err.code === 'auth/popup-closed-by-user'
         ? 'Окно входа было закрыто'
-        : error.code === 'auth/popup-blocked'
+        : err.code === 'auth/popup-blocked'
         ? 'Всплывающее окно заблокировано браузером'
-        : error.code === 'auth/cancelled-popup-request'
+        : err.code === 'auth/cancelled-popup-request'
         ? 'Запрос отменен'
-        : 'Ошибка при входе через Google';
+        : err.message || 'Ошибка при входе через Google';
       
       toast.error(errorMessage);
     } finally {

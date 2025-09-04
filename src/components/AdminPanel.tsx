@@ -6,14 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, 
-  RefreshCw, 
   Database,
   MapPin,
-  Calendar,
   Trash2,
   Edit,
   Plus,
-  Settings,
   Hash,
   Users,
   Mail,

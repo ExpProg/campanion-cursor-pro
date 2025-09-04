@@ -9,14 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, MapPin, Clock, Star, ArrowLeft, Mail, Phone, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Clock, Star, ArrowLeft, Mail, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import Image from 'next/image';
 import { getCampTypeColorClass, getDifficultyColorClass, getLogoPlaceholderColor, getInitials } from '@/lib/utils';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { createBookingRequest, checkUserBookingExists } from '@/lib/bookingService';
+import { checkUserBookingExists } from '@/lib/bookingService';
 import { toast } from 'sonner';
 import { BookingModal } from '@/components/BookingModal';
 import { AuthForm } from '@/components/AuthForm';
@@ -28,7 +27,7 @@ export default function CampDetailPage() {
   const { camps, allCamps, loading, error } = useCamps();
   const { user, userProfile } = useAuth();
   const { isAuthenticated, isAdmin } = useAuthRole();
-  const [isBooking, setIsBooking] = useState(false);
+  
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [hasExistingBooking, setHasExistingBooking] = useState(false);
   const [showAuthForm, setShowAuthForm] = useState(false);

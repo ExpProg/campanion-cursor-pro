@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { collection, getDocs, doc, updateDoc, addDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { AdminOnly } from '@/components/RoleProtected';
@@ -19,7 +19,7 @@ export default function MigratePage() {
       
       // Получаем все кэмпы
       const campsSnapshot = await getDocs(collection(db, 'camps'));
-      const camps = campsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const camps = campsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown>>;
       
       console.log(`📊 Найдено ${camps.length} кэмпов для миграции`);
       
@@ -34,7 +34,7 @@ export default function MigratePage() {
           
           // Получаем первого организатора (временно)
           const organizersSnapshot = await getDocs(collection(db, 'organizers'));
-          const organizers = organizersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+          const organizers = organizersSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown>>;
           
           if (organizers.length > 0) {
             const firstOrganizer = organizers[0];
@@ -77,11 +77,11 @@ export default function MigratePage() {
       
       // Получаем все кэмпы
       const campsSnapshot = await getDocs(collection(db, 'camps'));
-      const camps = campsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const camps = campsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown>>;
       
       // Получаем всех организаторов
       const organizersSnapshot = await getDocs(collection(db, 'organizers'));
-      const organizers = organizersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const organizers = organizersSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown>>;
       
       console.log(`📊 Найдено ${camps.length} кэмпов и ${organizers.length} организаторов`);
       
@@ -139,11 +139,11 @@ export default function MigratePage() {
       
       // Получаем все кэмпы
       const campsSnapshot = await getDocs(collection(db, 'camps'));
-      const camps = campsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const camps = campsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown>>;
       
       // Получаем всех организаторов
       const organizersSnapshot = await getDocs(collection(db, 'organizers'));
-      const organizers = organizersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      const organizers = organizersSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown>>;
       
       console.log('📊 ВСЕ КЭМПЫ:');
       camps.forEach(camp => {
